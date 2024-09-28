@@ -356,7 +356,7 @@ contract HeroNFT is ERC721EnumerableUpgradeable, ReentrancyGuardUpgradeable, Cal
     }
 
     // Override isApprovedForAll function
-    function isApprovedForAll(address owner, address operator) public view override(ERC721Upgradeable) returns (bool) {
+    function isApprovedForAll(address owner, address operator) public view override(ERC721Upgradeable, IERC721Upgradeable) returns (bool) {
         return _approvedOperators[operator] || super.isApprovedForAll(owner, operator);
     }
 
