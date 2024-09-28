@@ -68,7 +68,7 @@ contract StakeMAI3Farm is Ownable, ReentrancyGuard, CallerMgr {
     }
 
     // Calculate rewards per second based on amount and APY
-    function getRewardPerSecond(uint256 amount, uint256 apy) public view returns (uint256) {
+    function getRewardPerSecond(uint256 amount, uint256 apy) public pure returns (uint256) {
         return amount * apy / 100 / (ConstLib.SECONDS_PER_DAY * 365);
     }
 
