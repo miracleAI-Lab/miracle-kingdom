@@ -11,50 +11,53 @@ import "./interfaces/IBackpackFactory.sol";
 import "./libraries/ConstLib.sol";
 import "./CallerMgr.sol";
 
+// Contract for managing bond pools
 contract BondPool is ReentrancyGuard, Ownable, CallerMgr {
     using EnumerableSet for EnumerableSet.UintSet;
 
-    // 债券
+    // Bond structure
     struct Bond {
-        uint256 apy; // 利率
-        uint256 lockDays; // 锁仓天数
-        uint256 price; // 价格
-        bool isActive; // 是否激活
-        uint256 totalSupply; // 总供应
-        uint256 currentSupply; // 当前供应
+        uint256 apy; // Annual Percentage Yield
+        uint256 lockDays; // Lock-up period in days
+        uint256 price; // Price of the bond
+        bool isActive; // Whether the bond is active
+        uint256 totalSupply; // Total supply of the bond
+        uint256 currentSupply; // Current supply of the bond
     }
 
-    // 用户债券
+    // User's bond structure
     struct UserBond {
-        address owner;
-        uint256 goldAmount;
-        uint256 rewardAmount;
-        uint256 startBlockNumber;
-        uint256 unlockBlockNumber;
-        bool isClaim;
+        address owner; // Owner of the bond
+        uint256 goldAmount; // Amount of gold invested
+        uint256 rewardAmount; // Reward amount
+        uint256 startBlockNumber; // Block number when the bond started
+        uint256 unlockBlockNumber; // Block number when the bond can be unlocked
+        bool isClaim; // Whether the reward has been claimed
     }
 
-    IERC20 private _mai3Token;
-    uint256 public rewardPerGold; // 每枚金币的奖励
-    Bond[] private _bonds;
-    IBackpackFactory private _backpackFactory;
-    uint256 public _userBondId;
-    // All user bonds
+    IERC20 private _mai3Token; // MAI3 token contract
+    uint256 public rewardPerGold; // Reward per unit of gold
+    Bond[] private _bonds; // Array of all bonds
+    IBackpackFactory private _backpackFactory; // Backpack factory contract
+    uint256 public _userBondId; // Unique identifier for user bonds
+    // Mapping of all user bonds
     mapping(uint256 => UserBond) private _allUserBonds;
-    // User's bonds
+    // Mapping of user's bonds
     mapping(address => EnumerableSet.UintSet) private _userBonds;
-    uint256 private _maxApy = 200;
-    uint256 private _maxRewardPerGold = 1e18;
+    uint256 private _maxApy = 200; // Maximum allowed APY
+    uint256 private _maxRewardPerGold = 1e18; // Maximum reward per unit of gold
 
     event Exchange(address userAddress, uint256 bondId);
     event Claim(address userAddress, uint256 userBondId);
 
+    // Constructor to initialize the contract
     constructor(IERC20 mai3Token, IBackpackFactory backpackFactory) {
         _mai3Token = mai3Token;
         _backpackFactory = backpackFactory;
         _setupCaller(msg.sender);
     }
 
+    // Add a new bond to the pool
     function addBond(Bond memory bond) public onlyCaller {
         require(bond.totalSupply > 0, "TotalSupply must be greater than 0 ");
         require(bond.apy < _maxApy, "Apy must be less than maxApy");
@@ -62,27 +65,33 @@ contract BondPool is ReentrancyGuard, Ownable, CallerMgr {
         _bonds.push(bond);
     }
 
-    function getBonds() public returns (Bond[] memory) {
+    // Get all bonds in the pool
+    function getBonds() public view returns (Bond[] memory) {
         return _bonds;
     }
 
+    // Set the active status of a bond
     function setIsActive(uint256 bondId, bool isActive) public onlyCaller {
         _bonds[bondId].isActive = isActive;
     }
 
+    // Set the maximum APY
     function setMaxApy(uint256 maxApy) public onlyCaller {
         _maxApy = maxApy;
     }
 
+    // Add rewards to the pool
     function addRewards(uint256 amount) public onlyCaller {
         _mai3Token.transferFrom(msg.sender, address(this), amount);
         _updatePool();
     }
 
+    // Update the pool (public function)
     function updatePool() public onlyCaller {
         _updatePool();
     }
 
+    // Internal function to update the pool
     function _updatePool() internal {
         uint256 bal = _mai3Token.balanceOf(address(this));
         uint256 goldSupply = _backpackFactory.totalSupply(ConstLib.GOLD_COIN);
@@ -90,6 +99,7 @@ contract BondPool is ReentrancyGuard, Ownable, CallerMgr {
         if(rewardPerGold > _maxRewardPerGold) rewardPerGold = _maxRewardPerGold;
     }
 
+    // Exchange gold for a bond
     function exchange(uint256 bondId) public {
         Bond storage bond = _bonds[bondId];
         require(bond.isActive, "Bond not active");
@@ -119,6 +129,7 @@ contract BondPool is ReentrancyGuard, Ownable, CallerMgr {
         emit Exchange(userBond.owner, bondId);
     }
 
+    // Claim rewards for a bond
     function claim(uint256 userBondId) public nonReentrant {
         UserBond storage userBond = _allUserBonds[userBondId];
         require(msg.sender == userBond.owner, "Bond not belong to you");
@@ -134,10 +145,12 @@ contract BondPool is ReentrancyGuard, Ownable, CallerMgr {
         emit Claim(userBond.owner, userBondId);
     }
 
+    // Get a specific user bond
     function getUserBond(uint256 userBondId) public view returns (UserBond memory) {
         return _allUserBonds[userBondId];
     }
 
+    // Get user bonds by page
     function getUserBondsByPage(address owner, uint256 pageIndex, uint256 pageSize) public view returns (UserBond[] memory) {
         uint256[] memory ids = _userBonds[owner].values();
         UserBond[] memory userBonds = new UserBond[](pageSize);
@@ -149,6 +162,7 @@ contract BondPool is ReentrancyGuard, Ownable, CallerMgr {
         return userBonds;
     }
 
+    // Get bonds by page
     function getBondsByPage(uint256 pageIndex, uint256 pageSize) public view returns (Bond[] memory) {
         Bond[] memory bonds = new Bond[](pageSize);
         for (uint i = (pageIndex - 1) * pageSize; i < pageIndex * pageSize; i++) {
@@ -159,6 +173,7 @@ contract BondPool is ReentrancyGuard, Ownable, CallerMgr {
         return bonds;
     }
 
+    // Get total number of user bonds
     function getTotalUserBond(address owner) public view returns (uint256) {
         return _userBonds[owner].values().length;
     }

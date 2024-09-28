@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.11;
 
+// Import necessary OpenZeppelin contracts and interfaces
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -18,17 +19,21 @@ import "./interfaces/IGameDB2.sol";
 import "./interfaces/IFeeAccount.sol";
 import "./CallerUpgradeableMgr.sol";
 
+// Error for querying URI of non-existent token
 error URIQueryForNonexistentToken();
 
+// Library for HeroNFT specific errors
 library HeroNFTErrors {
     error IncorrectSender();
     error InsufficientFee();
 }
 
+// Main HeroNFT contract
 contract HeroNFT is ERC721EnumerableUpgradeable, ReentrancyGuardUpgradeable, CallerUpgradeableMgr {
     using Strings for uint256;
     using EnumerableSet for EnumerableSet.UintSet;
 
+    // Struct to store buy NFT order details
     struct BuyNftOrder {
         address owner;
         address referrer;
@@ -38,18 +43,20 @@ contract HeroNFT is ERC721EnumerableUpgradeable, ReentrancyGuardUpgradeable, Cal
         uint256 timestamp;
     }
 
+    // Mappings for various functionalities
     mapping(address => bool) private _approvedOperators;
     mapping(uint256 => uint256) private _tokenIdBoxIdMaps;
-    // Invitation relationship
     mapping(address => address) private _referrers;
     mapping(uint256 => BuyNftOrder) private _buyNftOrder;
 
+    // Arrays for rarity and level related data
     uint256[] private _rarityNum;
     uint256[] private _rarityPower;
     uint256[] private _rarityUpgrade;
     uint256[] private _levelRank;
     uint256[] private _raritys;
 
+    // Various contract state variables
     uint256 private _randSeed;
     IFeeAccount private _feeAccount;
     IGameDB private _gameDB;
@@ -63,15 +70,17 @@ contract HeroNFT is ERC721EnumerableUpgradeable, ReentrancyGuardUpgradeable, Cal
     uint256 public orderNo;
     uint256 public nftPrice;
 
+    // Error for VRF coordinator
     error OnlyCoordinatorCanFulfill(address have, address want);
 
-    //============== Events =======================
+    // Events
     event OpenBlinBox(uint256 tokenId, uint256 career, uint256 rarity);
     event LearnSkill(uint256 tokenId, uint256 skills);
     event HeroUpgrade(uint256 tokenId, uint256 level);
     event SetReferrer(address owner, address referrer);
     event BuyHeroNFT(uint256 orderNo, address owner, address referrer, uint256 amount, uint256 reward, uint256 nftNum);
 
+    // Modifiers
     modifier validNFTOwner(uint256 tokenId) {
         require(ownerOf(tokenId) == msg.sender, "NFT is not owner of you");
         _;
@@ -94,6 +103,7 @@ contract HeroNFT is ERC721EnumerableUpgradeable, ReentrancyGuardUpgradeable, Cal
         _;
     }
 
+    // Initialize function for the upgradeable contract
     function initialize(
         string memory _name,
         string memory _symbol,
@@ -118,11 +128,12 @@ contract HeroNFT is ERC721EnumerableUpgradeable, ReentrancyGuardUpgradeable, Cal
         nftPrice = 1000 * 1e18;
     }
 
+    // Set base URI for the NFTs
     function setBaseURI(string memory __baseURI) external onlyCaller {
         _baseURIExtended = __baseURI;
     }
 
-    // Buy blind boxes in batches and open them immediately
+    // Internal function to mint NFTs
     function mint(uint256 seed, uint256 quantity, address _mintTo) private returns (uint256[] memory)  {
         uint256 _lastId = totalSupply() + 1;
         uint256[] memory tokenIds = new uint256[](quantity);
@@ -138,7 +149,7 @@ contract HeroNFT is ERC721EnumerableUpgradeable, ReentrancyGuardUpgradeable, Cal
         return tokenIds;
     }
 
-    // Hero team hero upgrade
+    // Hero upgrade for hero team
     function heroUpgradeForHeroTeam(uint256 heroTeamId, uint256 tokenId) external validNFTOwnerForHeroTeam(heroTeamId, tokenId) {
         _heroUpgrade(tokenId);
     }
@@ -148,6 +159,7 @@ contract HeroNFT is ERC721EnumerableUpgradeable, ReentrancyGuardUpgradeable, Cal
         _heroUpgrade(tokenId);
     }
 
+    // Internal function for hero upgrade
     function _heroUpgrade(uint256 tokenId) private {
         GameLib.HeroMeta memory nftMeta = _gameDB.getHeroMeta(tokenId);
         GameLib.UpgradeExperience memory upgradeExperience = _gameDB2.getUpgradeExperiences()[nftMeta.level - 1];
@@ -175,16 +187,17 @@ contract HeroNFT is ERC721EnumerableUpgradeable, ReentrancyGuardUpgradeable, Cal
         emit HeroUpgrade(tokenId, nftMeta.level);
     }
 
-    // Hero team hero skill learning
+    // Learn skill for hero team
     function learnSkillForHeroTeam(uint256 heroTeamId, uint256 tokenId, uint256 skillId) external validNFTOwnerForHeroTeam(heroTeamId, tokenId) {
         _learnSkill(tokenId, skillId);
     }
 
-    // Skill learning
+    // Learn skill
     function learnSkill(uint256 tokenId, uint256 skillId) external validNFTOwner(tokenId) {
         _learnSkill(tokenId, skillId);
     }
 
+    // Internal function for learning skill
     function _learnSkill(uint256 tokenId, uint256 skillId) private {
         GameLib.Skill memory skill = _gameDB2.getSkill(skillId);
         require(skill.id > 0, "Skills don't exist");
@@ -222,7 +235,7 @@ contract HeroNFT is ERC721EnumerableUpgradeable, ReentrancyGuardUpgradeable, Cal
         emit LearnSkill(tokenId, skillId);
     }
 
-    // Batch open blind boxes
+    // Generate multiple heroes
     function _generate(uint256 _seed, uint256[] memory tokenIds) internal returns (bool) {
         for (uint i = 0; i < tokenIds.length; i++) {
             uint256 tokenId = tokenIds[i];
@@ -232,7 +245,7 @@ contract HeroNFT is ERC721EnumerableUpgradeable, ReentrancyGuardUpgradeable, Cal
         return true;
     }
 
-    // Open blind boxes
+    // Generate a single hero
     function _generateCallback(uint256 tokenId, uint256 _seed) private {
         uint256 rarity = 0;
         uint256 probability = 0; 
@@ -261,7 +274,7 @@ contract HeroNFT is ERC721EnumerableUpgradeable, ReentrancyGuardUpgradeable, Cal
         _generateHero(tokenId, rarity, _seed);
     }
 
-    // Generate NFT attribute values
+    // Generate hero attributes
     function _generateHero(uint256 tokenId, uint256 rarity, uint256 _seed) private {
         _seed += tokenId + rarity + 1;
         GameLib.HeroMeta memory nftMeta = _gameDB.getHeroMeta(tokenId);
@@ -342,14 +355,17 @@ contract HeroNFT is ERC721EnumerableUpgradeable, ReentrancyGuardUpgradeable, Cal
         return string(abi.encodePacked(_baseURIExtended, "/", meta.career, "-", meta.skinId, "-", meta.gender, ".png"));
     }
 
+    // Override isApprovedForAll function
     function isApprovedForAll(address owner, address operator) public view override(ERC721Upgradeable) returns (bool) {
         return _approvedOperators[operator] || super.isApprovedForAll(owner, operator);
     }
 
+    // Override supportsInterface function
     function supportsInterface(bytes4 interfaceId) public view override(AccessControlUpgradeable, ERC721EnumerableUpgradeable) returns (bool) {
         return super.supportsInterface(interfaceId);
     }
 
+    // Get token IDs owned by an address
     function getOwnerTokenIds(address owner) public view returns (uint256[] memory tokens) {
         tokens = new uint256[](balanceOf(owner));
         for (uint256 index = 0; index < tokens.length; index++) {
@@ -357,6 +373,7 @@ contract HeroNFT is ERC721EnumerableUpgradeable, ReentrancyGuardUpgradeable, Cal
         }
     }
 
+    // Get hero metas owned by an address
     function getOwnerHeroMetas(address owner) public view returns (GameLib.HeroMeta[] memory tokens) {
         tokens = new GameLib.HeroMeta[](balanceOf(owner));
         for (uint256 index = 0; index < tokens.length; index++) {
@@ -374,10 +391,12 @@ contract HeroNFT is ERC721EnumerableUpgradeable, ReentrancyGuardUpgradeable, Cal
         }
     }
 
+    // Get hero meta for a specific token ID
     function getHeroMeta(uint256 _tokenId) public view returns (GameLib.HeroMeta memory) {
         return _gameDB.getHeroMeta(_tokenId);
     }
 
+    // Get level hero metas for a specific token ID
     function getLevelHeroMetas(uint256 _tokenId) public view returns (GameLib.HeroMeta[] memory _heroMetas) {
         GameLib.HeroMeta memory meta = _gameDB.getHeroMeta(_tokenId);
         if (meta.level > 1) {
@@ -390,20 +409,24 @@ contract HeroNFT is ERC721EnumerableUpgradeable, ReentrancyGuardUpgradeable, Cal
         _heroMetas[1] = meta;
     }
 
+    // Set referrer for an address
     function _setReferrer(address owner, address referrer) private {
         _referrers[owner] = referrer;
 
         emit SetReferrer(owner, referrer);
     }
 
+    // Get referrer for an address
     function getReferrer(address owner) public view returns (address) {
         return _referrers[owner];
     }
 
+    // Start buying NFTs
     function startBuy() public onlyCaller {
         startBuyNft = true;
     }
 
+    // Buy NFTs
     function buy(uint256 num, address referrer, bytes32 nextSeed) public nonReentrant {
         require(startBuyNft, "Buy nft is stop");
         require(_buySeed != nextSeed, "The seed cannot be the same as last seed");
@@ -431,14 +454,17 @@ contract HeroNFT is ERC721EnumerableUpgradeable, ReentrancyGuardUpgradeable, Cal
         emit BuyHeroNFT(orderNo, owner, _referrer, amount, reward, num);
     }
 
+    // Set NFT price
     function setNftPrice(uint256 price) public onlyCaller {
         nftPrice = price;
     }
 
+    // Get buy seed
     function getBuySeed() public view onlyCaller returns (bytes32)  {
         return _buySeed;
     }
 
+    // Set buy seed
     function setBuySeed(bytes32 buySeed) public onlyCaller {
         _buySeed = buySeed;
     }

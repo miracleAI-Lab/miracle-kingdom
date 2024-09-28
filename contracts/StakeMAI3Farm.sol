@@ -7,35 +7,37 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./libraries/ConstLib.sol";
 import "./CallerMgr.sol";
 
+// Contract for staking MAI3 tokens and earning rewards
 contract StakeMAI3Farm is Ownable, ReentrancyGuard, CallerMgr {
-    // 存款池子信息
+    // Information about the staking pool
     struct PoolInfo {
-        IERC20 stakeToken; // 存款token地址
-        IERC20 rewardToken; // 奖励token地址
-        uint256 totaStaked;  // 当前总质押
-        uint256 totalReward; // 总奖励
+        IERC20 stakeToken; // Address of the token to be staked
+        IERC20 rewardToken; // Address of the reward token
+        uint256 totaStaked;  // Total amount currently staked
+        uint256 totalReward; // Total rewards distributed
         uint256 duration;
         uint256 apy;
-        uint256 stakeDays; // 质押天数
+        uint256 stakeDays; // Staking period in days
     }
 
-    // 用户存款信息
+    // Information about a user's stake
     struct UserInfo {
-        uint256 unlockTime;  // 解锁时间
-        uint256 stakeAmount;  // 存款金额
-        uint256 totalReward; // 领取奖励
-        uint256 rewardPerSecond; // 每秒奖励
-        uint256 lastRewardTime; // 上一次领取奖励时间
-        uint256 startTime; // 第一次存款时间
+        uint256 unlockTime;  // Time when the stake can be withdrawn
+        uint256 stakeAmount;  // Amount staked
+        uint256 totalReward; // Total rewards claimed
+        uint256 rewardPerSecond; // Rewards earned per second
+        uint256 lastRewardTime; // Last time rewards were claimed
+        uint256 startTime; // Time of the first deposit
     }
 
-    // 存款池子数组
+    // Array of staking pools
     PoolInfo[] private _poolInfo;
-    // 存储用户在池子下的存款记录
+    // Mapping of user stakes for each pool
     mapping(uint256 => mapping(address => UserInfo)) private _userInfo;
     bool private _startStaked;
     IERC20 private mai3Token;
 
+    // Events
     event Deposit(address indexed user, uint256 indexed poolId, uint256 _days, uint256 amount);
     event Claim(address indexed user, uint256 indexed poolId, uint256 _days, uint256 stakedAmount, uint256 reward);
     event Withdraw(address indexed user, uint256 indexed poolId, uint256 _days, uint256 stakedAmount, uint256 reward);
@@ -45,7 +47,7 @@ contract StakeMAI3Farm is Ownable, ReentrancyGuard, CallerMgr {
         _setupCaller(msg.sender);
     }
 
-    // 添加池子，参数：存款token的合约，奖励token的合约
+    // Add a new staking pool
     function addPool(IERC20 stakeToken, IERC20 rewardToken, uint256 stakeDays, uint256 apy) public onlyCaller {
         PoolInfo memory pool;
         pool.stakeToken = stakeToken;
@@ -55,21 +57,22 @@ contract StakeMAI3Farm is Ownable, ReentrancyGuard, CallerMgr {
         _poolInfo.push(pool);
     }
 
-    // 设置开启质押
+    // Enable or disable staking
     function setStartStaked(bool startStaked) public onlyCaller {
         _startStaked = startStaked;
     }
 
-     // 获取是否开启质押
+    // Check if staking is enabled
     function getStartStaked() external view returns (bool) {
         return _startStaked;
     }
 
+    // Calculate rewards per second based on amount and APY
     function getRewardPerSecond(uint256 amount, uint256 apy) public view returns (uint256) {
         return amount * apy / 100 / (ConstLib.SECONDS_PER_DAY * 365);
     }
 
-    // 存款金额到某个池子
+    // Deposit tokens into a staking pool
     function deposit(uint256 poolId, uint256 amount) public nonReentrant {  
         require(_startStaked, "Stake not start!");
         require(amount > 0, "Stake amount can not be 0!");
@@ -84,77 +87,79 @@ contract StakeMAI3Farm is Ownable, ReentrancyGuard, CallerMgr {
             user.startTime = block.timestamp;
             user.unlockTime = user.startTime + ConstLib.SECONDS_PER_DAY * pool.duration;
         } else {
-            // 先提取上次利息
+            // Claim pending rewards before updating stake
             uint256 pendingReward = getPendingReward(user);
             pool.totalReward += pendingReward;
             pool.rewardToken.transfer(msg.sender, pendingReward);
 
-            // 金额改变了，重新计算每秒收益
+            // Recalculate rewards per second with new stake amount
             user.stakeAmount += amount;
             user.rewardPerSecond = getRewardPerSecond(user.stakeAmount, pool.apy);
         }
         user.lastRewardTime = block.timestamp;
 
-        // 池子总存款金额
+        // Update total staked amount in the pool
         pool.totaStaked += amount;
         
         emit Deposit(msg.sender, poolId, pool.stakeDays, amount);
     }
 
+    // Internal function to claim rewards
     function _claim(uint256 poolId) private {
         UserInfo storage user = _userInfo[poolId][msg.sender];
         require(user.stakeAmount > 0, "stake amount must be > 0");
 
-        // 实时计算利息
+        // Calculate pending rewards
         uint256 pendingReward = getPendingReward(user);
         PoolInfo storage pool = _poolInfo[poolId];
         if(pendingReward > 0) {
-            // 记录池子下所有用户已领取的奖励
+            // Update total rewards in the pool
             pool.totalReward += pendingReward;
-            // 记录用户已领取的奖励
+            // Update user's total rewards
             user.totalReward += pendingReward;
-            // 记录下本次领取奖励的区块时间，方便计算实时奖励
+            // Update last reward time
             user.lastRewardTime = block.timestamp;
-            // 利息转给用户
+            // Transfer rewards to user
             safeTransfer(pool.rewardToken, msg.sender, pendingReward);
         }
 
         emit Claim(msg.sender, poolId, pool.stakeDays, user.stakeAmount, pendingReward);
     }
 
-    // 领取池子下某个存款的实时利息收益
+    // Claim rewards from a specific pool
     function claim(uint256 poolId) public nonReentrant {
         _claim(poolId);
     }
 
+    // Claim rewards from all pools
     function claimAll() public nonReentrant {
         for(uint poolId = 0; poolId < _poolInfo.length; poolId++) {
             _claim(poolId);
         }
     }
 
-    // 取回本金加利息
+    // Withdraw stake and rewards
     function withdraw(uint256 poolId) public nonReentrant {
         UserInfo storage user = _userInfo[poolId][msg.sender];
         require(user.stakeAmount > 0, "stake amount must be > 0");
         require(block.timestamp >= user.unlockTime, "unlock time not invalid");
 
-        // 先计算用户的利息奖励
+        // Calculate pending rewards
         uint256 pendingReward = getPendingReward(user);
         PoolInfo storage pool = _poolInfo[poolId];
         if(pendingReward > 0) {
-            // 记录池子下所有用户已领取的奖励
+            // Update total rewards in the pool
             pool.totalReward += pendingReward;
-            // 记录用户已领取的奖励
+            // Update user's total rewards
             user.totalReward += pendingReward;
-            // 记录下本次领取奖励的区块时间，方便计算实时奖励
+            // Update last reward time
             user.lastRewardTime = block.timestamp;
-            // 利息转给用户
+            // Transfer rewards to user
             safeTransfer(pool.rewardToken, msg.sender, pendingReward);
         }
-        // 池子下总存款金额减少当前用户的本金
+        // Update total staked amount in the pool
         pool.totaStaked -= user.stakeAmount;
-        // 本金转给用户
+        // Transfer stake back to user
         safeTransfer(pool.stakeToken, msg.sender, user.stakeAmount);
 
         emit Withdraw(msg.sender, poolId, pool.stakeDays, user.stakeAmount, pendingReward);
@@ -162,17 +167,17 @@ contract StakeMAI3Farm is Ownable, ReentrancyGuard, CallerMgr {
         delete _userInfo[poolId][msg.sender];
     }
 
-    // 获取所有池子信息
+    // Get information about all pools
     function getAllPools() public view returns (PoolInfo[] memory) {
        return _poolInfo;
     }
 
-    // 获取用户在某池子下所有的存款记录
+    // Get user's stake information for a specific pool
     function getStakedInfo(uint256 poolId, address owner) public view returns (UserInfo memory users) {
         users = _userInfo[poolId][owner];
     }
 
-    // 获取用户在所有池子下所有的存款记录
+    // Get user's stake information for all pools
     function getAllStakedInfo(address owner) public view returns (UserInfo[] memory stakedInfos) {
         stakedInfos = new UserInfo[](_poolInfo.length);
         for (uint i = 0; i < _poolInfo.length; i++) {
@@ -180,22 +185,23 @@ contract StakeMAI3Farm is Ownable, ReentrancyGuard, CallerMgr {
         }
     }
 
-    // 实时获取用户在某池子下所有存款记录的总利息收益
+    // Get pending rewards for a user in a specific pool
     function penddingRewardByPoolId(address owner, uint256 poolId) public view returns (uint256) {
         return getPendingReward(_userInfo[poolId][owner]);
     }
 
-    // 实时获取用户在某个池子下某条存款的利息收益
+    // Get pending rewards for a specific stake
     function pendingRewardByStakeId(address owner, uint256 poolId) public view returns (uint256) {
         return getPendingReward(_userInfo[poolId][owner]);
     }
 
+    // Calculate pending rewards for a user
     function getPendingReward(UserInfo memory user) internal view returns (uint256 pendingReward) {
         uint256 diffSeconds = block.timestamp - user.lastRewardTime;
         pendingReward = diffSeconds * user.rewardPerSecond;
     }
 
-    // 转账
+    // Safe transfer function to handle edge cases
     function safeTransfer(IERC20 token, address _to, uint256 amount) internal {
         uint256 bal = token.balanceOf(address(this));
         if (amount > bal) {

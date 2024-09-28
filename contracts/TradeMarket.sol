@@ -14,7 +14,9 @@ import "./interfaces/IEquipmentNFT.sol";
 import "./interfaces/ISharePool.sol";
 import "./CallerUpgradeableMgr.sol";
 
+// Contract for managing a trading marketplace for in-game items
 contract TradeMarket is Initializable, ReentrancyGuardUpgradeable, CallerUpgradeableMgr {
+    // Structure to represent a prop order
     struct PropOrder {
         uint256 propId;
         address owner;
@@ -40,11 +42,13 @@ contract TradeMarket is Initializable, ReentrancyGuardUpgradeable, CallerUpgrade
     IBackpackFactory private _backpackFactory;
     ISharePool private _sharePool; // Share pool
 
+    // Events
     event BuyOrder(uint256 orderNo, uint256 propId, address buyer, uint256 num, uint256 payAmount, uint256 payType);
     event CreateOrder(uint256 orderNo, uint256 propId, address owner, uint256 price, uint256 num, uint256 payType);
     event CancelOrder(uint256 orderNo, address owner);
     event UpdateSellOrder(uint256 orderNo, uint256 propId, address buyer, uint256 price, uint256 num, uint256 payType);
 
+    // Initialize the contract
     function initialize(
         IERC20 _usdtToken, 
         IERC20 _coreToken,
@@ -194,11 +198,13 @@ contract TradeMarket is Initializable, ReentrancyGuardUpgradeable, CallerUpgrade
         _backpackFactory.subBalance(tokenId, owner, num);
     }
 
+    // Swap CORE tokens for pMAI3 tokens
     function swapPMAI3(uint256 amount) public {
         coreToken.transferFrom(msg.sender, address(this), amount);
         pMAI3Token.transfer(msg.sender, amount);
     }
 
+    // Calculate the amount of gold coins that can be made from a given token and quantity
     function getMakeGoldNum(uint256 tokenId, uint256 num) public pure returns (uint256) {
         if (tokenId == ConstLib.GOLD_SILVE_STONE) {
             return num * 2;
@@ -215,26 +221,32 @@ contract TradeMarket is Initializable, ReentrancyGuardUpgradeable, CallerUpgrade
         } 
     }
 
+    // Get prop order details
     function getPropOrder(uint256 orderNo) public view returns (PropOrder memory) {
         return _propOrders[orderNo];
     }
 
+    // Set GM sell account
     function setGmSellAccount(address account) public onlyCaller {
         _gmSellAccount[msg.sender] = account;
     }
 
+    // Set share pool
     function setSharePool(ISharePool sharePool) public onlyCaller {
         _sharePool = sharePool;
     }
 
+    // Get current order number
     function getOrderNo() public view returns (uint256) {
         return _orderNo;
     }
 
+    // Set protocol fee
     function setProtocolFee(uint256 _protocolFee) public onlyCaller {
         protocolFee = _protocolFee;
     }
 
+    // Set treasury address
     function setTreasury(address _treasury) public onlyCaller {
         treasury = _treasury;
     }

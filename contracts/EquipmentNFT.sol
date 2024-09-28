@@ -38,6 +38,7 @@ contract EquipmentNFT is ERC721EnumerableUpgradeable, CallerUpgradeableMgr {
 
     event OpenBlinBox(uint256 tokenId, uint256 career, uint256 rarity);
 
+    // Initialize the contract with necessary parameters
     function initialize(
         string memory _name,
         string memory _symbol,
@@ -55,24 +56,26 @@ contract EquipmentNFT is ERC721EnumerableUpgradeable, CallerUpgradeableMgr {
         _pMAIToken = pMAIToken;
     }
 
+    // Set operators for the contract
     function setOperators(address[] memory addrs, bool isOperator) external onlyCaller {
         for (uint256 index = 0; index < addrs.length; index++) {
             _approvedOperators[addrs[index]] = isOperator;
         }
     }
 
+    // Set the base URI for token metadata
     function setBaseURI(string memory __baseURI) external onlyCaller {
         _baseURIExtended = __baseURI;
     }
 
-    // Forge equipment
+    // Mint a new equipment NFT
     function mint(uint256 equipId, uint256[] memory gemstones, address owner) external onlyCaller {
         uint256 tokenId = totalSupply() + 1;
         _safeMint(owner, tokenId);
         _generate(tokenId, equipId, gemstones, owner);
     }
 
-    // Generate attributes for forged equipment NFTs.
+    // Generate attributes for forged equipment NFTs
     function _generate(
         uint256 tokenId, 
         uint256 equipId, 
@@ -85,35 +88,37 @@ contract EquipmentNFT is ERC721EnumerableUpgradeable, CallerUpgradeableMgr {
         meta.gemstones = gemstones;
         require(meta.gemstones[0] + meta.gemstones[1] + meta.gemstones[2] <= meta.inlayNum, "Exceeded the maximum number of inlays");
 
-        // The materials consumed in forging equipment.
+        // Consume materials for forging equipment
         for (uint i = 0; i < equipment.material.length; i++) {
             uint256 propId = equipment.material[i];
             uint256 propNum = equipment.materialNum[i];
             _backpackFactory.subBalance(propId, owner, propNum);
         }
 
-        // The consumption of embedded gems.
+        // Consume embedded gems
         _backpackFactory.subBalance(ConstLib.RED_GEM_STONE, owner, meta.gemstones[0]);
         _backpackFactory.subBalance(ConstLib.BLUE_GEM_STONE, owner, meta.gemstones[1]);
         _backpackFactory.subBalance(ConstLib.YELLOW_GEM_STONE, owner, meta.gemstones[2]);
 
         _pMAIToken.transferFrom(msg.sender, address(this), equipment.fee);
 
+        // Set equipment metadata
         meta.name = equipment.name;
         meta.equipId = equipment.id;
         meta.tokenId = tokenId;
-        meta.typeId = equipment.typeId;     // Equipment type
-        meta.careers = equipment.careers;     // Hero profession
-        meta.minLevel = equipment.minLevel; // Required level
+        meta.typeId = equipment.typeId;
+        meta.careers = equipment.careers;
+        meta.minLevel = equipment.minLevel;
         meta.durable = equipment.durable;
         meta.unit = equipment.unit;
         meta.star = equipment.star;
 
+        // Generate random attributes
         uint256 seeds = tokenId + equipId + gemstones.length + 1;
-        uint256 valueStart = equipment.mainValues[0]; // Minimum main attribute
-        uint256 valueEnd = equipment.mainValues[1];   // Maximum main attribute
+        uint256 valueStart = equipment.mainValues[0];
+        uint256 valueEnd = equipment.mainValues[1];
         meta.mainValues = new uint256[](2);
-        meta.mainValues[0] = GameLib.getRandxNum(seeds, valueStart, valueEnd); // Minimum random main attribute
+        meta.mainValues[0] = GameLib.getRandxNum(seeds, valueStart, valueEnd);
         meta.mainValues[1] = valueEnd;
         meta.valueType = equipment.valueType;
         meta.quality = equipment.quality;
@@ -127,6 +132,7 @@ contract EquipmentNFT is ERC721EnumerableUpgradeable, CallerUpgradeableMgr {
         _gameDB.setEquipmentMeta(meta);
     }
 
+    // Get the token URI for a given token ID
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
         GameLib.EquipmentMeta memory meta = _gameDB.getEquipmentMeta(tokenId);
         bytes memory dataURI = abi.encodePacked(
@@ -136,18 +142,22 @@ contract EquipmentNFT is ERC721EnumerableUpgradeable, CallerUpgradeableMgr {
         return string(abi.encodePacked("data:application/json;base64,", Base64.encode(dataURI)));
     }
 
+    // Get the image URL for a given equipment ID
     function _getImageURL(uint256 equipId) private pure returns (string memory) {
         return string(abi.encodePacked("/", equipId, ".png"));
     }
 
+    // Check if an address is approved for all operations
     function isApprovedForAll(address owner, address operator) public view override(ERC721Upgradeable) returns (bool) {
         return _approvedOperators[operator] || super.isApprovedForAll(owner, operator);
     }
 
+    // Check if the contract supports a given interface
     function supportsInterface(bytes4 interfaceId) public view override(ERC721EnumerableUpgradeable, AccessControlUpgradeable) returns (bool) {
         return super.supportsInterface(interfaceId);
     }
 
+    // Get all token IDs owned by a given address
     function getOwnerTokenIds(address owner) public view returns (uint256[] memory tokens) {
         tokens = new uint256[](balanceOf(owner));
         for (uint256 index = 0; index < tokens.length; index++) {
@@ -155,6 +165,7 @@ contract EquipmentNFT is ERC721EnumerableUpgradeable, CallerUpgradeableMgr {
         }
     }
 
+    // Get all equipment metas owned by a given address
     function getOwnerEquipmentMetas(address owner) public view returns (GameLib.EquipmentMeta[] memory tokens) {
         tokens = new GameLib.EquipmentMeta[](balanceOf(owner));
         for (uint256 index = 0; index < tokens.length; index++) {
@@ -162,7 +173,7 @@ contract EquipmentNFT is ERC721EnumerableUpgradeable, CallerUpgradeableMgr {
         }
     }
 
-    // Get user equipment NFT list data by page.
+    // Get user equipment NFT list data by page
     function getOwnerEquipmentMetasByPage(address owner, uint256 pageIndex, uint256 pageSize) public view returns (GameLib.EquipmentMeta[] memory tokens) {
         uint256 maxNum = balanceOf(owner);
         tokens = new GameLib.EquipmentMeta[](pageSize);
@@ -172,6 +183,7 @@ contract EquipmentNFT is ERC721EnumerableUpgradeable, CallerUpgradeableMgr {
         }
     }
 
+    // Get equipment metadata for a given token ID
     function getEquipmentMeta(uint256 _tokenId) public view returns (GameLib.EquipmentMeta memory) {
         return _gameDB.getEquipmentMeta(_tokenId);
     }

@@ -7,18 +7,20 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "./libraries/GameLib.sol";
 import "./CallerMgr.sol";
 
+// Contract for storing and managing game data
 contract GameDB2 is Initializable, CallerMgr {
     using EnumerableSet for EnumerableSet.UintSet;
 
     // Experience required for hero upgrades
     GameLib.UpgradeExperience[] private _upgradeExperiences;
-    // Props
+    // Props (items) in the game
     GameLib.Prop[] private _props;
     // Skill template data
     GameLib.Skill[] private _skills;
     // Equipment template data
     GameLib.Equipment[] private _equipments;
 
+    // Initialize the contract
     function initialize() public initializer {
         _setupCaller(msg.sender);
     }
@@ -77,14 +79,14 @@ contract GameDB2 is Initializable, CallerMgr {
         return _skills[skillId - 1];
     }
 
-    // Sets the item data
+    // Adds new items to the game
     function addProps(GameLib.Prop[] calldata props) external onlyCaller {
         for (uint i = 0; i < props.length; i++) {
             _props.push(props[i]);
         }
     }
 
-    // 更新道具数据
+    // Updates an existing item's data
     function updateProp(GameLib.Prop calldata prop) external onlyCaller {
         for (uint i = 0; i < _props.length; i++) {
             GameLib.Prop memory p = _props[i];
@@ -95,7 +97,7 @@ contract GameDB2 is Initializable, CallerMgr {
         }
     }
 
-    // Updates item data
+    // Sets or updates a specific item's data
     function setProp(GameLib.Prop calldata prop) external onlyCaller {
         GameLib.Prop memory p = _props[prop.id - 1];
         if (prop.id == p.id) {
@@ -103,14 +105,14 @@ contract GameDB2 is Initializable, CallerMgr {
         }
     }
 
-    // Sets the equipment template data
+    // Adds new equipment templates to the game
     function addEquipments(GameLib.Equipment[] calldata equipments) external onlyCaller {
         for (uint i = 0; i < equipments.length; i++) {
             _equipments.push(equipments[i]);
         }
     }
 
-    // Updates the equipment template data
+    // Updates an existing equipment template's data
     function updateEquipment(GameLib.Equipment calldata equipment) external onlyCaller {
         for (uint i = 0; i < _equipments.length; i++) {
             GameLib.Equipment memory p = _equipments[i];
@@ -121,7 +123,7 @@ contract GameDB2 is Initializable, CallerMgr {
         }
     }
 
-    // Sets the equipment template data
+    // Sets or updates a specific equipment template's data
     function setEquipment(GameLib.Equipment calldata equipment) external onlyCaller {
         GameLib.Equipment memory p = _equipments[equipment.id - 1];
         if (equipment.id == p.id) {

@@ -110,32 +110,6 @@ async function main() {
     contracts.signAccount,
   );
 
-  // const StakeFarm = await deployContract(
-  //     "StakeFarm",
-  // );
-  //
-  // const StakeETH = await deployContract(
-  //     "StakeETH",
-  //     StakeFarm.address,
-  // );
-  //
-  //
-  // const StakeMAI3 = await deployContract(
-  //     "StakeMAI3",
-  //     MaiToken.address,
-  //     StakeFarm.address,
-  // );
-
-  // const StakeUSDB = await deployContract(
-  //     "StakeUSDB",
-  //     StakeFarm.address,
-  // );
-
-  // const StakeWETH = await deployContract(
-  //     "StakeWETH",
-  //     contracts.WethToken,
-  // );
-
   const StakeMAI3Farm = await deployContract(
       "StakeMAI3Farm",
       MaiToken.address,

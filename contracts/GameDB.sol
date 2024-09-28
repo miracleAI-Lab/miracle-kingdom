@@ -25,6 +25,7 @@ contract GameDB is Initializable, CallerMgr {
     // Hero Team Protection Time(heroTeamId => endTime)
     mapping(uint256 => uint256) private _heroTeamProtectionTimes;
 
+    // Initialize the contract
     function initialize() public initializer {
         _setupCaller(msg.sender);
     }
@@ -43,24 +44,27 @@ contract GameDB is Initializable, CallerMgr {
         return _tokenIndexEquipmentMetas[tokenId];
     }
 
-    // NFT hero information
+    // Set NFT hero information
     function setHeroMeta(GameLib.HeroMeta calldata meta) external onlyCaller {
         _tokenIndexHeroMetas[meta.tokenId] = meta;
     }
 
-    // NFT equipment information
+    // Set NFT equipment information
     function setEquipmentMeta(GameLib.EquipmentMeta calldata meta) external onlyCaller {
         _tokenIndexEquipmentMetas[meta.tokenId] = meta;
     }
 
+    // Set hero team information
     function setHeroTeam(GameLib.HeroTeam memory heroTeam) external onlyCaller {
         _heroTeams[heroTeam.id] = heroTeam;
     }
 
+    // Get hero team information by ID
     function getHeroTeam(uint256 heroTeamId) external view returns (GameLib.HeroTeam memory) {
         return _heroTeams[heroTeamId];
     }
 
+    // Get hero meta information for a hero team
     function getHeroTeamMetas(uint256 heroTeamId) external view returns (GameLib.HeroMeta[] memory) {
         GameLib.HeroTeam memory heroTeam = _heroTeams[heroTeamId];
         GameLib.HeroMeta[] memory metas = new GameLib.HeroMeta[](3);
@@ -73,18 +77,22 @@ contract GameDB is Initializable, CallerMgr {
         return metas;
     }
 
+    // Delete a hero team
     function deleteHeroTeam(uint256 heroTeamId) external onlyCaller {
         delete _heroTeams[heroTeamId];
     }
 
+    // Add a hero team to a user's collection
     function addUserHeroTeam(address owner, uint256 heroTeamId) external onlyCaller {
         _userHeroTeams[owner].add(heroTeamId);
     }
 
+    // Check if a hero team exists for a user
     function existsHeroTeam(address owner, uint256 heroTeamId) external view returns (bool) {
         return _userHeroTeams[owner].contains(heroTeamId);
     }
 
+    // Delete a hero team from a user's collection
     function deleteUserHeroTeam(uint256 heroTeamId) external onlyCaller {
         _userHeroTeams[msg.sender].remove(heroTeamId);
     }
@@ -106,10 +114,12 @@ contract GameDB is Initializable, CallerMgr {
         return _userHeroTeams[owner].values().length;
     }
 
+    // Get all hero teams for a user
     function getUserHeroTeams(address owner) public view returns (uint256[] memory) {
         return _userHeroTeams[owner].values();
     }
 
+    // Get user hero teams by page
     function getUserHeroTeamsByPage(address owner, uint256 pageIndex, uint256 pageSize) public view returns (GameLib.HeroTeam[] memory) {
         uint256[] memory teamIds = _userHeroTeams[owner].values();
         GameLib.HeroTeam[] memory heroTeamList = new GameLib.HeroTeam[](pageSize);
@@ -143,14 +153,17 @@ contract GameDB is Initializable, CallerMgr {
         return metas;
     }
 
+    // Get learned skills for a hero
     function getHeroLearnSkills(uint256 tokenId) external view returns (GameLib.LearnSkill[] memory) {
         return _heroLearnSkills[tokenId];
     }
 
+    // Get a specific learned skill for a hero
     function getLearnSkill(uint256 tokenId, uint256 skillId) external view returns (GameLib.LearnSkill memory) {
         return _getLearnSkill(tokenId, skillId);
     }
 
+    // Internal function to get a specific learned skill for a hero
     function _getLearnSkill(uint256 tokenId, uint256 skillId) internal view returns (GameLib.LearnSkill memory skill) {
         for (uint256 i = 0; i < _heroLearnSkills[tokenId].length; i++) {
             GameLib.LearnSkill memory ls = _heroLearnSkills[tokenId][i];
@@ -160,6 +173,7 @@ contract GameDB is Initializable, CallerMgr {
         }
     }
 
+    // Learn a new skill or update an existing one for a hero
     function learnSkill(uint256 tokenId, uint256 index, GameLib.LearnSkill calldata ls) external onlyCaller {
         if(ls.level > 1) {
             _heroLearnSkills[tokenId][index] = ls;
@@ -178,10 +192,12 @@ contract GameDB is Initializable, CallerMgr {
         _heroEquipments[tokenId] = equipments;
     }
 
+    // Set protection time for a hero team
     function setHeroTeamProtectionTime(uint256 heroTeamId, uint256 endTime) external onlyCaller {
         _heroTeamProtectionTimes[heroTeamId] = endTime;
     }
 
+    // Get protection time for a hero team
     function getHeroTeamProtectionTime(uint256 heroTeamId) external view returns (uint256) {
         return _heroTeamProtectionTimes[heroTeamId];
     }

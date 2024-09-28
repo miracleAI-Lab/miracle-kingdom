@@ -25,37 +25,37 @@ contract GameFight is Initializable, ReentrancyGuardUpgradeable, EIP712Upgradeab
 
     // Game task structure definition
     struct GameTask {
-        string name; // Name
-        uint256 id;
-        uint256 maxPlayerNum; // Maximum number of participants
+        string name; // Name of the game task
+        uint256 id; // Unique identifier for the game task
+        uint256 maxPlayerNum; // Maximum number of participants allowed
         uint256 joinPlayerNum; // Current number of participants
-        uint256 gameFee;   // Entrance fee
+        uint256 gameFee;   // Entrance fee for the game task
         uint256 totalFee;  // Total entrance fee income
         uint256 rank;      // Rank restriction for registration
         uint256 startTime; // Task start time
         uint256 endTime;   // Task end time
-        uint256 taskType;  // Task type
-        uint256 fightLimit; // Fight limit
-        uint256 mapId;
-        uint256 round;
+        uint256 taskType;  // Type of the task
+        uint256 fightLimit; // Limit on the number of fights
+        uint256 mapId; // ID of the map for the task
+        uint256 round; // Round number of the task
         uint256[] rarities;  // Array of restricted card rarities
     }
 
     // Reward structure definition
     struct Reward {
-        uint256 id;
-        uint256 num;
+        uint256 id; // Unique identifier for the reward
+        uint256 num; // Number of rewards
     }
 
     // Fight record structure definition
     struct FightRecord {
-        address owner;
-        uint256 gameTaskId;
-        uint256 fightNo;
-        uint256 mapId;
-        uint256 heroTeamId;
-        uint256 experiences;
-        bool claimed;
+        address owner; // Address of the player
+        uint256 gameTaskId; // ID of the game task
+        uint256 fightNo; // Fight number
+        uint256 mapId; // ID of the map
+        uint256 heroTeamId; // ID of the hero team
+        uint256 experiences; // Experience gained from the fight
+        bool claimed; // Whether the rewards have been claimed
     }
 
     // Private variables declaration
@@ -212,6 +212,7 @@ contract GameFight is Initializable, ReentrancyGuardUpgradeable, EIP712Upgradeab
         emit ClaimRewards(msg.sender, record.gameTaskId, record.fightNo, record.mapId, record.heroTeamId);
     }
 
+    // Claim rank rewards function
     function claimRankRewards(
         uint256[] calldata fightNos,
         uint256 exp,
@@ -284,6 +285,7 @@ contract GameFight is Initializable, ReentrancyGuardUpgradeable, EIP712Upgradeab
         emit ClaimRankRewards(msg.sender, gameTaskId, mapId, heroTeamId);
     }
 
+    // Claim airdrop rewards function
     function claimAirdropRewards(uint256 nonce, uint256 tokenAmount, uint256 point, bytes calldata signature) public nonReentrant {
         require(!_nonces[nonce], "nonce have been used");
         require(_verifyClaimAirdropRewards(msg.sender, nonce, tokenAmount, point, signature), "verifyAirdropClaimRewards error");
@@ -315,6 +317,7 @@ contract GameFight is Initializable, ReentrancyGuardUpgradeable, EIP712Upgradeab
         return SignatureCheckerUpgradeable.isValidSignatureNow(_signer, digest, signature);
     }
 
+    // Verify claim rank rewards function
     function _verifyClaimRankRewards(
         address owner,
         uint256[] calldata fightNos,
@@ -337,6 +340,7 @@ contract GameFight is Initializable, ReentrancyGuardUpgradeable, EIP712Upgradeab
         return SignatureCheckerUpgradeable.isValidSignatureNow(_signer, digest, signature);
     }
 
+    // Verify claim airdrop rewards function
     function _verifyClaimAirdropRewards(
         address owner,
         uint256 nonce,
@@ -418,6 +422,7 @@ contract GameFight is Initializable, ReentrancyGuardUpgradeable, EIP712Upgradeab
         _signer = signer;
     }
 
+    // Get game fight counts function
     function getGameFightCounts(uint256 heroTeamId, uint256 gameTaskId) public view returns (uint256) {
         return _gameFightCounts[heroTeamId][gameTaskId];
     }

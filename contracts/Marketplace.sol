@@ -10,35 +10,30 @@ import "@openzeppelin/contracts-upgradeable/token/ERC721/IERC721ReceiverUpgradea
 import "./interfaces/ISharePool.sol";
 import "./CallerUpgradeableMgr.sol";    
 
+// Marketplace contract for trading NFTs
 contract Marketplace is Initializable, IERC721ReceiverUpgradeable, CallerUpgradeableMgr {
     using SafeMath for uint256;
     using EnumerableSet for EnumerableSet.UintSet;
 
+    // Structure to store trade details
     struct TradeDetail {
         IERC721 nft;
         uint256 id;
-        // nft tokenId
         uint256 tokenId;
-        // Sale time
         uint256 saleAt;
-        // Cancellation time
         uint256 cancelAt;
-        // Transaction time
         uint256 tradeAt;
-        // Buyer
         address buyer;
-        // Seller
         address owner;
-        // Sale price
         uint256 price;
     }
 
+    // Enum to represent supported NFT types
     enum SupportNFTType {
         Hero,
         Equipment
     }
 
-    // Team handling fee address
     address public treasury;
     uint256 public feePercent;
     uint256 public totalRecords;
@@ -48,16 +43,18 @@ contract Marketplace is Initializable, IERC721ReceiverUpgradeable, CallerUpgrade
     EnumerableSet.UintSet private _activeTradeIdSet;
     mapping(uint256 => TradeDetail) public tradeDetails;
     mapping(address => bool) public supportNFTs;
-    mapping(address => SupportNFTType) public supportNFTTypes;//address => type
+    mapping(address => SupportNFTType) public supportNFTTypes;
 
-    // Record all active tradeIds of users, records should be deleted on cancellation or successful transaction
+    // Mapping to store active trade IDs for each user
     mapping(address => EnumerableSet.UintSet) private _accountActiveTradeDetails;
 
+    // Events for various marketplace actions
     event TradeActive(uint256 indexed _detailId, uint256 indexed tokenId, address seller, uint256 price, uint256 _type);
     event TradeCancled(uint256 indexed _detailId, uint256 indexed tokenId, uint256 nftType);
     event TradeSucceeded(uint256 indexed _detailId, uint256 indexed tokenId, address buyer, uint256 _type);
     event TradeFeeToTreasury(uint256 indexed _detailId, address indexed buyer, address indexed seller, uint256 orderPrice, uint256 fee, uint256 timestamp);
 
+    // Initialize the marketplace contract
     function initialize(
         address[] calldata _nfts,
         IERC20 _erc20Token,
@@ -75,6 +72,7 @@ contract Marketplace is Initializable, IERC721ReceiverUpgradeable, CallerUpgrade
         }
     }
 
+    // Create a new order to sell an NFT
     function createOrder(
         IERC721 _nft,
         uint256 _tokenId,
@@ -97,6 +95,7 @@ contract Marketplace is Initializable, IERC721ReceiverUpgradeable, CallerUpgrade
         emit TradeActive(_detailId, _tokenId, owner, _price, nftType);
     }
 
+    // Cancel an existing order
     function cancel(uint256 _detailId) external {
         address owner = tradeDetails[_detailId].owner;
         uint256 tokenId = tradeDetails[_detailId].tokenId;
@@ -115,6 +114,7 @@ contract Marketplace is Initializable, IERC721ReceiverUpgradeable, CallerUpgrade
         delete tradeDetails[_detailId];
     }
 
+    // Buy an NFT from an existing order
     function buyOrder(
         uint256 _detailId,
         uint256 price
@@ -132,9 +132,9 @@ contract Marketplace is Initializable, IERC721ReceiverUpgradeable, CallerUpgrade
 
         erc20Token.transferFrom(buyer, address(this), orderPrice);
         erc20Token.transfer(owner, price);
-        // Treasury account
+        // Transfer half of the fee to the treasury
         erc20Token.transfer(treasury, fee / 2);
-        // Share pool
+        // Add the other half of the fee to the share pool
         erc20Token.approve(address(_sharePool), type(uint256).max);
         _sharePool.addRewards(fee / 2);
 
@@ -150,6 +150,7 @@ contract Marketplace is Initializable, IERC721ReceiverUpgradeable, CallerUpgrade
         delete tradeDetails[_detailId];
     }
 
+    // Get order information by detail ID
     function getOrderInfoByDetailId(uint256 _detailId) external view returns (uint256, address, address) {
         address owner = tradeDetails[_detailId].owner;
         address _buyer = msg.sender;
@@ -161,6 +162,7 @@ contract Marketplace is Initializable, IERC721ReceiverUpgradeable, CallerUpgrade
         return (orderPrice, owner, address(erc20Token));
     }
 
+    // Get active trade details for a specific account
     function getAccountActiveDetails(address account) external view returns (TradeDetail[] memory) {
         TradeDetail[] memory _details = new TradeDetail[](_accountActiveTradeDetails[account].length());
         for (uint256 i = 0; i < _details.length; i++) {
@@ -169,10 +171,12 @@ contract Marketplace is Initializable, IERC721ReceiverUpgradeable, CallerUpgrade
         return _details;
     }
 
+    // Get all active trade IDs
     function getActiveTradeIds() external view returns (uint256[] memory) {
         return _activeTradeIdSet.values();
     }
 
+    // Get all active trade details
     function getActiveTradeDetails() external view returns (TradeDetail[] memory) {
         TradeDetail[] memory _details = new TradeDetail[](_activeTradeIdSet.length());
         for (uint256 i = 0; i < _details.length; i++) {
@@ -181,6 +185,7 @@ contract Marketplace is Initializable, IERC721ReceiverUpgradeable, CallerUpgrade
         return _details;
     }
 
+    // Implement ERC721 receiver interface
     function onERC721Received(
         address,
         address,
@@ -190,6 +195,7 @@ contract Marketplace is Initializable, IERC721ReceiverUpgradeable, CallerUpgrade
         return this.onERC721Received.selector;
     }
 
+    // Get trade details for a specific page
     function getTradeDetailPage(uint256 pageSize, uint256 pageIndex) external view returns (TradeDetail[] memory) {
         uint256 balance = _activeTradeIdSet.length();
         uint256 beginIndex = pageSize * pageIndex;
@@ -211,16 +217,19 @@ contract Marketplace is Initializable, IERC721ReceiverUpgradeable, CallerUpgrade
         return _tradeDetails;
     }
 
+    // Set the ERC20 token used for transactions
     function setERC20Token(address _erc20Token) external onlyCaller {
         erc20Token = IERC20(_erc20Token);
     }
 
+    // Set supported NFTs
     function setSupportNFTs(address[] memory nfts, bool isSupport) external onlyCaller {
         for (uint256 index = 0; index < nfts.length; index++) {
             supportNFTs[nfts[index]] = isSupport;
         }
     }
 
+    // Set supported NFT types
     function setSupportNFTType(address[] memory nfts, uint8[] memory _types) external onlyCaller {
         require(nfts.length == _types.length, "_types length error");
 
@@ -229,18 +238,22 @@ contract Marketplace is Initializable, IERC721ReceiverUpgradeable, CallerUpgrade
         }
     }
 
+    // Get the supported NFT type for a given NFT address
     function getSupportNFTType(address _nft) public view returns (SupportNFTType) {
         return supportNFTTypes[_nft];
     }
 
+    // Set the treasury address
     function setTreasury(address _treasury) external onlyCaller {
         treasury = _treasury;
     }
 
+    // Set the fee percentage
     function setFeePercent(uint256 _feePercent) external onlyCaller {
         feePercent = _feePercent;
     }
 
+    // Set the share pool address
     function setSharePool(ISharePool sharePool) external onlyCaller {
         _sharePool = sharePool;
     }

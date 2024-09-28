@@ -12,20 +12,27 @@ import "./libraries/GameLib.sol";
 import "./libraries/ConstLib.sol";
 import "./interfaces/IGameDB.sol";
 
+// Player contract for managing hero teams and equipment
 contract Player is Initializable, IERC721Receiver  {
     using EnumerableSet for EnumerableSet.UintSet;
 
-    // Free mint records
+    // Mapping to track free mint records
     mapping(address => bool) private _freemint;
-    // Invitation relationship
+    // Mapping to store invitation relationships
     mapping(address => address) private _referrers;
 
+    // Interface for game database
     IGameDB private _gameDB;
+    // Interface for hero NFT
     IERC721 private _heroNFT;
+    // Interface for equipment NFT
     IERC721 private _equipmentNFT;
+    // ID for hero team
     uint256 private _heroTeamId;
+    // Set to store token IDs
     EnumerableSet.UintSet private tokenIds;
 
+    // Events
     event SetReferrer(address owner, address referrer);
     event HeroEquipment(uint256 tokenId, uint256[] equipments);
     event SetHeroEquipment(uint256 tokenId, uint256[] equTokenIds);
@@ -33,13 +40,14 @@ contract Player is Initializable, IERC721Receiver  {
     event UpdateHeroTeam(address owner, uint256 id, string name, uint256[] tokenIds, uint256 rank);
     event CloseHeroTeam(address owner, uint256 id);
 
+    // Initialize the contract
     function initialize(IERC721 heroNFT, IERC721 equipmentNFT, IGameDB gameDB) public initializer {
         _gameDB = gameDB;
         _heroNFT = heroNFT;
         _equipmentNFT = equipmentNFT;
     }
 
-    // Create my hero team
+    // Create a new hero team
     function createHeroTeam(GameLib.HeroTeam memory heroTeam) external {
         require(heroTeam.tokenIds.length == 3, "The team must contain 3 NFTs");
         require(heroTeam.tokenIds[0] != heroTeam.tokenIds[1] && heroTeam.tokenIds[0] != heroTeam.tokenIds[2] && heroTeam.tokenIds[1] != heroTeam.tokenIds[2]);
@@ -50,10 +58,12 @@ contract Player is Initializable, IERC721Receiver  {
         require(heroMeta1.rank == heroMeta2.rank && heroMeta2.rank == heroMeta3.rank, "Heroes of the same rank are required to form a team");
         require(heroMeta1.career + heroMeta2.career + heroMeta3.career == ConstLib.WARRIOR + ConstLib.MAGE + ConstLib.ASSASSIN, "The professions of three heroes must be different");
 
+        // Transfer hero NFTs to this contract
         for (uint i = 0; i < heroTeam.tokenIds.length; i++) {
             _heroNFT.safeTransferFrom(msg.sender, address(this), heroTeam.tokenIds[i]);
         }
 
+        // Increment hero team ID and set team details
         _heroTeamId++;
         heroTeam.id = _heroTeamId;
         heroTeam.rank = heroMeta1.rank;
@@ -64,7 +74,7 @@ contract Player is Initializable, IERC721Receiver  {
         emit CreateHeroTeam(msg.sender, heroTeam.id, heroTeam.name, heroTeam.tokenIds, heroTeam.rank);
     }
 
-    // Modify my hero team, cannot modify if signed up
+    // Update an existing hero team
     function updateHeroTeam(GameLib.HeroTeam memory heroTeam) external {       
         require(heroTeam.tokenIds.length == 3, "The team must contain 3 NFTs");
         require(heroTeam.tokenIds[0] != heroTeam.tokenIds[1] && heroTeam.tokenIds[0] != heroTeam.tokenIds[2] && heroTeam.tokenIds[1] != heroTeam.tokenIds[2]);
@@ -77,6 +87,7 @@ contract Player is Initializable, IERC721Receiver  {
         require(heroMeta1.rank == heroMeta2.rank && heroMeta2.rank == heroMeta3.rank, "Heroes of the same rank are required to form a team");
         require(heroMeta1.career + heroMeta2.career + heroMeta3.career == ConstLib.WARRIOR + ConstLib.MAGE + ConstLib.ASSASSIN, "The professions of three heroes must be different");
 
+        // Transfer new hero NFTs to this contract if needed
         for (uint i = 0; i < heroTeam.tokenIds.length; i++) {
             tokenIds.add(heroTeam.tokenIds[i]);
             if (_heroNFT.ownerOf(heroTeam.tokenIds[i]) != address(this)) {
@@ -84,6 +95,7 @@ contract Player is Initializable, IERC721Receiver  {
             }
         }
 
+        // Transfer old hero NFTs back to the owner if not in the new team
         GameLib.HeroTeam memory oldHeroTeam = _gameDB.getHeroTeam(heroTeam.id);
         for (uint i = 0; i < oldHeroTeam.tokenIds.length; i++) {
             if (!tokenIds.contains(oldHeroTeam.tokenIds[i])) {
@@ -91,22 +103,25 @@ contract Player is Initializable, IERC721Receiver  {
             }
         }
 
+        // Update hero team details
         heroTeam.rank = heroMeta1.rank;
         _gameDB.setHeroTeam(heroTeam);
 
         emit UpdateHeroTeam(msg.sender, heroTeam.id, heroTeam.name, heroTeam.tokenIds, heroTeam.rank);
     }
 
-    // Disband team, cannot be disbanded if signed up for a match
+    // Disband a hero team
     function closeHeroTeam(uint256 heroTeamId) external {       
         require(_gameDB.existsHeroTeam(msg.sender, heroTeamId), "Team id does not belong to you");
         require(block.timestamp >= _gameDB.getHeroTeamProtectionTime(heroTeamId), "The team is on a clearance mission and cannot be modified");
 
+        // Transfer hero NFTs back to the owner
         GameLib.HeroTeam memory heroTeam = _gameDB.getHeroTeam(heroTeamId);
         for (uint i = 0; i < heroTeam.tokenIds.length; i++) {
             _heroNFT.safeTransferFrom(address(this), msg.sender, heroTeam.tokenIds[i]);
         }
 
+        // Remove hero team from database
         _gameDB.deleteHeroTeam(heroTeamId);
         _gameDB.deleteUserHeroTeam(heroTeamId);
 
@@ -136,6 +151,7 @@ contract Player is Initializable, IERC721Receiver  {
         _setHeroEquipment(tokenId, typeIds, equTokenIds);
     }
 
+    // Internal function to set hero equipment
     function _setHeroEquipment(uint256 tokenId, uint256[] calldata typeIds, uint256[] calldata equTokenIds) private {
         require(typeIds.length == equTokenIds.length, "tokenIds length not match");
 
@@ -172,11 +188,13 @@ contract Player is Initializable, IERC721Receiver  {
             oldEquTokenIds[typeIds[i] - 1] = equTokenId;
         }
 
+        // Update hero equipment in database
         _gameDB.setHeroEquipments(tokenId, oldEquTokenIds);
 
         emit SetHeroEquipment(tokenId, equTokenIds);
     }
 
+    // Function to handle receiving ERC721 tokens
     function onERC721Received(
         address,
         address,
