@@ -1,2 +1,15 @@
-# miracle-kingdom
-A full-chain card game smart contract called "Miracle Kingdom" includes features such as blind box drawing (without using Chainlink VRF for randomness). Hero cards have attributes like rarity, level, equipment, and game loot. Both heroes and equipment are NFTs. The game also features an NFT marketplace, a game item trading marketplace, battles.
+# Basic Sample Hardhat Project
+
+This project demonstrates a basic Hardhat use case. It comes with a sample contract, a test for that contract, a sample script that deploys that contract, and an example of a task implementation, which simply lists the available accounts.
+
+Try running some of the following tasks:
+
+```shell
+npx hardhat accounts
+npx hardhat compile
+npx hardhat clean
+npx hardhat test
+npx hardhat node
+node scripts/sample-script.js
+npx hardhat help
+```

@@ -1,0 +1,22 @@
+node_modules
+.deps
+.env.prod
+.env.local
+coverage
+coverage.json
+typechain
+typechain-types
+abi
+.DS_Store
+.openzeppelin
+.idea
+yarn.lock
+yarn-error.log
+npm-debug.log
+package-lock.json
+
+#Hardhat files
+cache
+artifacts
+.vscode/
+
